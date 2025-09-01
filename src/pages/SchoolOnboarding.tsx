@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { ChevronRight, ChevronLeft, School, Building2, Users, GraduationCap, BookOpen, DoorOpen } from 'lucide-react';
-import { Calendar, Heart } from 'lucide-react';
+import { Calendar, Heart, BarChart3 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
 import Select from 'react-select';
@@ -13,6 +13,7 @@ import StudentsStep from '../components/onboarding/StudentsStep';
 import ClassroomsStep from '../components/onboarding/ClassroomsStep';
 import EnrollmentStep from '../components/onboarding/EnrollmentStep';
 import AttendanceStep from '../components/onboarding/AttendanceStep';
+import AssessmentStep from '../components/onboarding/AssessmentStep';
 import ReviewStep from '../components/onboarding/ReviewStep';
 
 type OnboardingStep = 
@@ -24,6 +25,7 @@ type OnboardingStep =
   | 'classrooms'
   | 'enrollment'
   | 'attendance'
+  | 'assessments'
   | 'review';
 
 interface District {
@@ -139,6 +141,24 @@ interface AttendanceRecord {
   };
 }
 
+interface AssessmentRecord {
+  assessment_id: string;
+  student_id: string;
+  assessment_type: string;
+  subject: string;
+  grade_level: string;
+  school_year?: string;
+  test_date: Date;
+  raw_score?: number;
+  scale_score: number;
+  performance_level_text: string;
+  min_possible_score: string;
+  max_possible_score: string;
+  student_growth_percentile?: number;
+  subscores?: any;
+  unprocessed_data?: any;
+}
+
 interface IndividualizedNeed {
   need_id: string;
   student_id: string;
@@ -163,6 +183,7 @@ interface OnboardingData {
   classrooms: Classroom[];
   enrollments: ClassroomEnrollment[];
   attendanceRecords: AttendanceRecord[];
+  assessmentRecords: AssessmentRecord[];
   individualizedNeeds: IndividualizedNeed[];
 }
 
@@ -175,6 +196,7 @@ const steps: { id: OnboardingStep; title: string; icon: React.FC }[] = [
   { id: 'classrooms', title: 'Classrooms', icon: BookOpen },
   { id: 'enrollment', title: 'Enrollment', icon: DoorOpen },
   { id: 'attendance', title: 'Attendance', icon: Calendar },
+  { id: 'assessments', title: 'Assessments', icon: BarChart3 },
   { id: 'review', title: 'Review', icon: ChevronRight }
 ];
 
@@ -191,6 +213,7 @@ export default function SchoolOnboarding() {
   classrooms: [],
   enrollments: [],
   attendanceRecords: [],
+  assessmentRecords: [],
   individualizedNeeds: []   // ← keep only one copy, add comma
 });
 
@@ -300,6 +323,14 @@ export default function SchoolOnboarding() {
         if (attendanceError) throw attendanceError;
       }
 
+      // Create assessment records
+      for (const assessmentRecord of onboardingData.assessmentRecords) {
+        const { error: assessmentError } = await supabase
+          .from('assessment_external_processed')
+          .insert(assessmentRecord);
+        if (assessmentError) throw assessmentError;
+      }
+
       // Create individualized needs
       for (const need of onboardingData.individualizedNeeds) {
         const { error: needError } = await supabase
@@ -319,6 +350,7 @@ export default function SchoolOnboarding() {
         classrooms: [],
         enrollments: [],
         attendanceRecords: [],
+        assessmentRecords: [],
         individualizedNeeds: []
       });
       setCurrentStep('district');
@@ -356,6 +388,13 @@ export default function SchoolOnboarding() {
           data={onboardingData.attendanceRecords} 
           students={onboardingData.students} 
           onUpdate={(data) => setOnboardingData(prev => ({ ...prev, attendanceRecords: data }))}
+          schoolId={onboardingData.school.school_id}
+        />;
+      case 'assessments':
+        return <AssessmentStep 
+          data={onboardingData.assessmentRecords} 
+          students={onboardingData.students} 
+          onUpdate={(data) => setOnboardingData(prev => ({ ...prev, assessmentRecords: data }))}
           schoolId={onboardingData.school.school_id}
         />;
       case 'individualized_needs':
